@@ -1,7 +1,7 @@
 " generate tabline, very straight forward
 function! wintabs#ui#get_tabline()
   let [spaceline, spaceline_len] = s:get_spaceline()
-  let bufline = s:get_bufline(0)
+  let bufline = s:get_bufline(0, 1)
   let line = s:truncate_line(0, bufline, &columns - spaceline_len)
   return line.'%='.spaceline
 endfunction
@@ -15,7 +15,7 @@ endfunction
 
 " generate statusline window by window
 function! wintabs#ui#get_statusline(window)
-  let bufline = s:get_bufline(a:window)
+  let bufline = s:get_bufline(a:window, 0)
   let line = s:truncate_line(a:window, bufline, winwidth(a:window))
 
   " reseter is attached to detect stale status
@@ -35,7 +35,7 @@ endfunction
 " private functions below
 
 " generate bufline per window
-function! s:get_bufline(window)
+function! s:get_bufline(window, is_for_tabline)
   call wintabs#refresh_buflist(a:window)
 
   let line = g:wintabs_ui_sep_leftmost
@@ -43,6 +43,10 @@ function! s:get_bufline(window)
   let active_start = 0
   let active_end = 0
   let active_higroup_len = 0
+
+  let active_highlight = '%#'.g:wintabs_ui_active_higroup.'#'
+  let inactive_highlight = (a:is_for_tabline ? '%#TabLine#' : '%##')
+  let highlight_reset = (a:is_for_tabline ? '%#TabLineFill#' : '%##')
 
   for buffer in wintabs#getwinvar(a:window, 'wintabs_buflist', [])
     " get buffer name and normalize
@@ -71,23 +75,23 @@ function! s:get_bufline(window)
 
       " add active tab markers and highlight group
       let name = g:wintabs_ui_active_left.name.g:wintabs_ui_active_right
-      let name = '%#'.g:wintabs_ui_active_higroup.'#'.name.'%##'
+      let name = active_highlight.name.highlight_reset
 
       " save position of current buffer
       let active_start = len(line)
       let active_end = len(line.name)
-      let active_higroup_len = len('%##%##'.g:wintabs_ui_active_higroup)
+      let active_higroup_len = len(active_highlight) + len(highlight_reset)
     else
+      let name = inactive_highlight.name.highlight_reset
       let name = name.g:wintabs_ui_sep_inbetween
     endif
-
     let line = line.name
   endfor
 
   if line == g:wintabs_ui_sep_leftmost
     " remove separators if buflist is empty
     let line = ''
-  elseif line[-3:] != '%##'
+  elseif line[-len(highlight_reset):] != highlight_reset
     " change last 'inbetween' separator to 'rightmost'
     let line = line[:-(seplen+1)].g:wintabs_ui_sep_rightmost
   endif
@@ -225,6 +229,9 @@ function! s:get_spaceline()
     return ['', 0]
   endif
 
+  let active_highlight = '%#'.g:wintabs_ui_active_higroup.'#'
+  let inactive_highlight = '%#TabLine#'
+  let highlight_reset = '%#TabLineFill#'
   let line = g:wintabs_ui_sep_spaceline
   let length = 1
   for tab in range(1, spaces)
@@ -235,14 +242,14 @@ function! s:get_spaceline()
     if tab == tabpagenr()
       let name = g:wintabs_ui_active_vimtab_left.name.g:wintabs_ui_active_vimtab_right
       let length += len(name)
-      let name = '%#'.g:wintabs_ui_active_higroup.'#'.name.'%##'
+      let name = active_highlight.name.highlight_reset
     else
-      let name = ' '.name.' '
+      let name = inactive_highlight.name.highlight_reset
       let length += len(name)
     endif
 
     " make name clickable
-    let name = '%'.tab.'T'.name.'%T'
+    let name = (tab == 1 ? '' : ' ').'%'.tab.'T'.name.(tab == spaces ? ' ' : '')
 
     let line = line.name
   endfor
